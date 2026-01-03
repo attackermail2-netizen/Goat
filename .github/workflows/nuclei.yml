@@ -45,7 +45,7 @@ jobs:
           mkdir -p ~/tools && cd ~/tools
           
           # Download ProjectDiscovery tools
-          for tool in "subfinder: 2.8.0" "httpx:1.7.1" "nuclei:3.4.10" "katana:1.2.1"; do
+          for tool in "subfinder: 2.11.0" "httpx:1.7.4" "nuclei:3.6.2" "katana:1.3.0"; do
             name=${tool%:*}
             ver=${tool#*:}
             wget -q "https://github.com/projectdiscovery/$name/releases/latest/download/${name}_${ver}_linux_amd64.zip"
