@@ -48,11 +48,11 @@ jobs:
           for tool in "subfinder:2.8.0" "httpx:1.7.1" "nuclei:3.4.10" "katana:1.2.1"; do
             name=${tool%:*}
             ver=${tool#*:}
-            wget -q "https://github.com/projectdiscovery/$name/releases/latest/download/${name}_${ver}_linux_amd64.zip"
+            wget -q "https://github.com/projectdiscovery/$name/releases/download/v${ver}/${name}_${ver}_linux_amd64.zip"
             unzip -o -q "${name}_${ver}_linux_amd64.zip"
             rm "${name}_${ver}_linux_amd64.zip"
           done
-          
+
           # Download notify separately
           wget -q "https://github.com/projectdiscovery/notify/releases/download/v1.0.7/notify_1.0.7_linux_amd64.zip"
           unzip -o -q notify_1.0.7_linux_amd64.zip
