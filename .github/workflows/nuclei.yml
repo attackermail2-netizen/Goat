@@ -37,7 +37,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path:  ~/tools
-          key: pdtools-v2-${{ runner. os }}
+          key: pdtools-v2-${{ runner.os }}
           
       - name: Install tools
         if: steps.cache-tools.outputs.cache-hit != 'true'
@@ -45,7 +45,7 @@ jobs:
           mkdir -p ~/tools && cd ~/tools
           
           # Download ProjectDiscovery tools
-          for tool in "subfinder: 2.8.0" "httpx:1.7.1" "nuclei:3.4.10" "katana:1.2.1"; do
+          for tool in "subfinder:2.8.0" "httpx:1.7.1" "nuclei:3.4.10" "katana:1.2.1"; do
             name=${tool%:*}
             ver=${tool#*:}
             wget -q "https://github.com/projectdiscovery/$name/releases/latest/download/${name}_${ver}_linux_amd64.zip"
@@ -79,13 +79,13 @@ jobs:
           restore-keys: nuclei-templates-
           
       - name:  Clone templates
-        if: steps. cache-templates.outputs.cache-hit != 'true'
+        if: steps.cache-templates.outputs.cache-hit != 'true'
         run: git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates.git
           
       - name: Setup notify
         env:
           TELEGRAM_API_KEY: ${{ secrets.TELEGRAM_API_KEY }}
-          TELEGRAM_CHAT_ID: ${{ secrets. TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           cat > notify.yml <<EOF
           telegram:
@@ -107,12 +107,12 @@ jobs:
           
       - name:  Execute scan
         run: |
-          FILE="upload/${{ inputs. file_name }}"
+          FILE="upload/${{ inputs.file_name }}"
           CMD="${{ inputs.command }}"
           MODE="${{ inputs.notification_mode }}"
           BULK="${{ inputs.bulk_filename }}"
           
-          echo "Starting scan:  $(date)"
+          echo "Starting scan: $(date)"
           
           if [[ "$MODE" == "bulk" ]]; then
             cat "$FILE" | eval "$CMD" > "$BULK" && {
@@ -126,7 +126,7 @@ jobs:
             }
           else
             cat "$FILE" | eval "$CMD" | notify -pc notify.yml -silent || {
-              echo "❌ Scan failed" | notify -pc notify. yml -silent
+              echo "❌ Scan failed" | notify -pc notify.yml -silent
               exit 1
             }
           fi
@@ -138,7 +138,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: scan-results
-          path: ${{ inputs. bulk_filename }}
+          path: ${{ inputs.bulk_filename }}
           retention-days: 7
           
       - name: Cleanup
