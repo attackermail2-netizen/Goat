@@ -1,8 +1,11 @@
 #!/bin/bash
 
-# Configuration
-GITHUB_TOKEN="GITHUB_TOEKN"
-GITHUB_REPO="GITHUB_REPO"
+# Configuration - Replace these placeholders with your actual values
+# Get your GitHub token from: https://github.com/settings/tokens (needs 'repo' scope)
+# GITHUB_TOKEN: Personal access token for GitHub API authentication
+# GITHUB_REPO: Repository in format "username/repository" (e.g., "the5orcerer/GOAT")
+GITHUB_TOKEN="YOUR_GITHUB_TOKEN_HERE"
+GITHUB_REPO="YOUR_GITHUB_REPO_HERE"
 GITHUB_API="https://api.github.com"
 
 # Colors for output
@@ -100,9 +103,22 @@ if [[ "$notification_mode" != "line" && "$notification_mode" != "bulk" ]]; then
   exit 1
 fi
 
-if [[ -z "$GITHUB_TOKEN" ]]; then
-  echo -e "${RED}[!] GITHUB_TOKEN environment variable not set${NC}"
-  echo "Export your GitHub token: export GITHUB_TOKEN=your_token_here"
+if [[ -z "$GITHUB_TOKEN" || "$GITHUB_TOKEN" == "YOUR_GITHUB_TOKEN_HERE" ]]; then
+  echo -e "${RED}[!] GITHUB_TOKEN is not configured${NC}"
+  echo "Please set your GitHub token in the script or export it as an environment variable:"
+  echo "  export GITHUB_TOKEN=your_token_here"
+  echo ""
+  echo "Get your token from: https://github.com/settings/tokens"
+  echo "Required scope: 'repo' (Full control of private repositories)"
+  exit 1
+fi
+
+if [[ -z "$GITHUB_REPO" || "$GITHUB_REPO" == "YOUR_GITHUB_REPO_HERE" ]]; then
+  echo -e "${RED}[!] GITHUB_REPO is not configured${NC}"
+  echo "Please set your repository in the script or export it as an environment variable:"
+  echo "  export GITHUB_REPO=username/repository"
+  echo ""
+  echo "Example: export GITHUB_REPO=the5orcerer/GOAT"
   exit 1
 fi
 
