@@ -1,8 +1,8 @@
 name: Security Scanning Pipeline
 
 on:
-  workflow_dispatch:
-    inputs:
+  workflow_dispatch: 
+    inputs: 
       file_name:
         required: true
         type: string
@@ -10,7 +10,7 @@ on:
       command:
         required: true
         type: string
-        description: "Command to execute (cat filename and notify will be auto-handled)"
+        description: "Command to execute"
       notification_mode:
         required: false
         type: choice
@@ -22,73 +22,57 @@ on:
       bulk_filename:
         required: false
         type: string
-        default: "results.txt"
-        description: "Output filename for bulk mode (only used when notification_mode is bulk)"
+        default:  "results.txt"
+        description: "Output filename for bulk mode"
 
 jobs:
-  scan:
+  scan: 
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        
+      - uses:  actions/checkout@v4
+          
       - name: Cache tools
         id: cache-tools
         uses: actions/cache@v4
         with:
-          path: ~/tools
+          path:  ~/tools
           key: pdtools-v2-${{ runner.os }}
           
-      - name: Install security tools
+      - name: Install tools
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
-          echo "[*] Installing ProjectDiscovery tools (not cached)..."
-          mkdir -p ~/tools
+          mkdir -p ~/tools && cd ~/tools
           
-          # Download pre-compiled binaries (much faster than go install)
-          echo "[*] Downloading subfinder..."
-          wget -q https://github.com/projectdiscovery/subfinder/releases/latest/download/subfinder_2.8.0_linux_amd64.zip
-          unzip -o -q subfinder_2.8.0_linux_amd64.zip
-          mv subfinder ~/tools/
-          
-          echo "[*] Downloading httpx..."
-          wget -q https://github.com/projectdiscovery/httpx/releases/latest/download/httpx_1.7.1_linux_amd64.zip
-          unzip -o -q httpx_1.7.1_linux_amd64.zip
-          mv httpx ~/tools/
-          
-          echo "[*] Downloading nuclei..."
-          wget -q https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_3.4.10_linux_amd64.zip
-          unzip -o -q nuclei_3.4.10_linux_amd64.zip
-          mv nuclei ~/tools/
-          
-          echo "[*] Downloading katana..."
-          wget -q https://github.com/projectdiscovery/katana/releases/latest/download/katana_1.2.1_linux_amd64.zip
-          unzip -o -q katana_1.2.1_linux_amd64.zip
-          mv katana ~/tools/
-          
-          echo "[*] Downloading notify..."
-          wget -q https://github.com/projectdiscovery/notify/releases/latest/download/notify_1.0.7_linux_amd64.zip
+          # Download ProjectDiscovery tools
+          for tool in "subfinder:2.8.0" "httpx:1.7.1" "nuclei:3.4.10" "katana:1.2.1" "naabu:2.3.1" "alterx:0.0.4"; do
+            name=${tool%:*}
+            ver=${tool#*:}
+            wget -q "https://github.com/projectdiscovery/$name/releases/download/v${ver}/${name}_${ver}_linux_amd64.zip"
+            unzip -o -q "${name}_${ver}_linux_amd64.zip"
+            rm "${name}_${ver}_linux_amd64.zip"
+          done
+
+          # Download notify separately
+          wget -q "https://github.com/projectdiscovery/notify/releases/download/v1.0.7/notify_1.0.7_linux_amd64.zip"
           unzip -o -q notify_1.0.7_linux_amd64.zip
-          mv notify ~/tools/
+          rm notify_1.0.7_linux_amd64.zip
           
-          chmod +x ~/tools/*
-          echo "[+] Tools downloaded successfully"
+          chmod +x *
+          echo "Tools installed"
           
-      - name: Setup tool paths
+      - name: Setup PATH
         run: |
-          # Add tools to PATH
           echo "$HOME/tools" >> $GITHUB_PATH
+          ~/tools/subfinder -version
+          ~/tools/httpx -version
+          ~/tools/nuclei -version
+          ~/tools/katana -version
+          ~/tools/naabu -version
+          ~/tools/alterx -version
+          ~/tools/notify -version
           
-          # Verify installations
-          echo "[*] Verifying tool installations..."
-          ~/tools/subfinder -version || echo "subfinder not found"
-          ~/tools/httpx -version || echo "httpx not found" 
-          ~/tools/nuclei -version || echo "nuclei not found"
-          ~/tools/katana -version || echo "katana not found"
-          ~/tools/notify -version || echo "notify not found"
-          
-      - name: Cache nuclei templates
+      - name: Cache templates
         id: cache-templates
         uses: actions/cache@v4
         with:
@@ -96,109 +80,62 @@ jobs:
           key: nuclei-templates-${{ github.run_id }}
           restore-keys: nuclei-templates-
           
-      - name: Clone nuclei templates
+      - name:  Clone templates
         if: steps.cache-templates.outputs.cache-hit != 'true'
-        run: |
-          echo "[*] Cloning nuclei templates..."
-          git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates.git
-          echo "[+] Templates cloned"
+        run: git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates.git
           
-      - name: Create notify credentials file
+      - name: Setup notify
         env:
           TELEGRAM_API_KEY: ${{ secrets.TELEGRAM_API_KEY }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "[*] Creating temporary notify credentials file..."
-          cat > temp_creds.yml << EOF
+          cat > notify.yml <<EOF
           telegram:
             - id: "tel"
               telegram_api_key: "$TELEGRAM_API_KEY"
               telegram_chat_id: "$TELEGRAM_CHAT_ID"
-              telegram_format: "{{data}}"
+              telegram_format:  "{{data}}"
               telegram_parsemode: "Markdown"
           EOF
-          echo "[+] Temporary credentials file created"
           
-      - name: Verify input file exists
+      - name:  Verify input
         run: |
-          if [ ! -f "upload/${{ inputs.file_name }}" ]; then
-            echo "[!] Input file upload/${{ inputs.file_name }} not found in repository"
-            echo "[*] Available files in upload directory:"
-            ls -la upload/ || echo "Upload directory doesn't exist"
+          [[ -f "upload/${{ inputs.file_name }}" ]] || {
+            echo "Error: File not found: upload/${{ inputs.file_name }}"
+            ls -la upload/ 2>/dev/null || echo "upload/ directory missing"
             exit 1
-          fi
-          echo "[+] Input file upload/${{ inputs.file_name }} found"
-          echo "[*] File size: $(wc -l < upload/${{ inputs.file_name }}) lines"
+          }
+          echo "Input file: upload/${{ inputs.file_name }} ($(wc -l < upload/${{ inputs.file_name }}) lines)"
           
-      - name: Execute scanning pipeline
+      - name:  Execute scan
         run: |
-          echo "[*] Building pipeline..."
-          echo "[*] Input file: upload/${{ inputs.file_name }}"
-          echo "[*] Command: ${{ inputs.command }}"
-          echo "[*] Notification mode: ${{ inputs.notification_mode }}"
+          FILE="upload/${{ inputs.file_name }}"
+          CMD="${{ inputs.command }}"
+          MODE="${{ inputs.notification_mode }}"
+          BULK="${{ inputs.bulk_filename }}"
           
-          # Determine notification command based on mode
-          if [ "${{ inputs.notification_mode }}" = "bulk" ]; then
-            # For bulk mode, save output to file first, then send via notify -data
-            BULK_FILE="${{ inputs.bulk_filename }}"
-            echo "[*] Bulk mode: saving results to $BULK_FILE"
-            
-            # Build pipeline with output redirection
-            SCAN_PIPELINE="cat upload/${{ inputs.file_name }} | ${{ inputs.command }} > $BULK_FILE"
-            NOTIFY_PIPELINE="notify -pc temp_creds.yml -silent -data $BULK_FILE"
-            
-            echo "[*] Scan pipeline: $SCAN_PIPELINE"
-            echo "[*] Notify pipeline: $NOTIFY_PIPELINE"
+          echo "Starting scan: $(date)"
+          
+          if [[ "$MODE" == "bulk" ]]; then
+            cat "$FILE" | eval "$CMD" > "$BULK" && {
+              [[ -s "$BULK" ]] && {
+                echo "Results: $(wc -l < $BULK) lines"
+                notify -pc notify.yml -silent -data "$BULK" || echo "Notify failed"
+              } || echo "ℹ️ No results" | notify -pc notify.yml -silent
+            } || {
+              echo "❌ Scan failed" | notify -pc notify.yml -silent
+              exit 1
+            }
           else
-            # For line mode (default), use standard piping
-            echo "[*] Line mode: sending results line by line"
-            FULL_PIPELINE="cat upload/${{ inputs.file_name }} | ${{ inputs.command }} | notify -pc temp_creds.yml -silent"
-            echo "[*] Full pipeline: $FULL_PIPELINE"
+            cat "$FILE" | eval "$CMD" | notify -pc notify.yml -silent || {
+              echo "❌ Scan failed" | notify -pc notify.yml -silent
+              exit 1
+            }
           fi
           
-          echo "[*] Started at: $(date)"
+          echo "Completed: $(date)"
           
-          # Execute the pipeline with error handling
-          if [ "${{ inputs.notification_mode }}" = "bulk" ]; then
-            # Execute scan pipeline first
-            if eval "$SCAN_PIPELINE"; then
-              echo "[+] Scan completed successfully"
-              
-              # Check if results file exists and has content
-              if [ -f "$BULK_FILE" ] && [ -s "$BULK_FILE" ]; then
-                echo "[*] Results file created with $(wc -l < $BULK_FILE) lines"
-                echo "[*] Sending bulk notification..."
-                
-                # Send bulk notification
-                if eval "$NOTIFY_PIPELINE"; then
-                  echo "[+] Bulk notification sent successfully"
-                else
-                  echo "[!] Bulk notification failed"
-                  exit 1
-                fi
-              else
-                echo "[*] No results to send (empty or missing results file)"
-                echo "ℹ️ Scan completed but no results found for upload/${{ inputs.file_name }}" | notify -pc temp_creds.yml -silent || true
-              fi
-            else
-              echo "[!] Scan pipeline failed with exit code $?"
-              echo "❌ Scanning failed for upload/${{ inputs.file_name }}" | notify -pc temp_creds.yml -silent || true
-              exit 1
-            fi
-          else
-            # Execute line mode pipeline
-            if eval "$FULL_PIPELINE"; then
-              echo "[+] Pipeline completed successfully"
-            else
-              echo "[!] Pipeline failed with exit code $?"
-              echo "❌ Scanning failed for upload/${{ inputs.file_name }}" | notify -pc temp_creds.yml -silent || true
-              exit 1
-            fi
-          fi
-          
-          echo "[*] Completed at: $(date)"
-          
-      - name: Upload results (bulk mode only)
+      - name: Upload results
         if: inputs.notification_mode == 'bulk'
         uses: actions/upload-artifact@v4
         with:
@@ -209,8 +146,6 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          # Clean up temporary files
-          rm -f temp_creds.yml
+          rm -f notify.yml
           rm -f ${{ inputs.bulk_filename }} 2>/dev/null || true
           rm -rf nuclei-templates
-          echo "[+] Cleanup completed"
